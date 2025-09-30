@@ -1,0 +1,4 @@
+_target_: lmask.models.model.LMaskPenaltyModel
+
+policy:
+  _target_: lmask.models.policy.TSPTWPolicy

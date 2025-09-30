@@ -1,0 +1,10 @@
+lightning==2.5.0.post0
+numpy==2.2.6
+omegaconf==2.3.0
+ortools==9.11.4210
+pandas==2.2.3
+pyrootutils==1.0.4
+pyvrp==0.11.0
+rl4co==0.5.2
+torch==2.5.1
+tqdm==4.66.5

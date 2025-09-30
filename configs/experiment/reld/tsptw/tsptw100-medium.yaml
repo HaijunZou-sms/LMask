@@ -1,0 +1,46 @@
+# @package _global_
+
+defaults:
+  - base.yaml
+  - _self_
+
+env:
+  _target_: lmask.envs.TSPTWEnv
+  generator_params:
+    num_loc: 99
+    hardness: medium
+  val_file: [random/tsptw/val/tsptw100_val_medium_seed4321.npz]
+
+model:
+  _target_: lmask.models.model.LMaskPenaltyModel
+  policy:
+    _target_: lmask.models.policy.TSPTWPolicy
+    decoder_class: reld
+  penalty_type: combined_penalty
+  entropy_coef: 0.05
+  optimizer_kwargs:
+    lr: 4e-4
+    weight_decay: 1e-6
+  lr_scheduler:
+    "MultiStepLR"
+  lr_scheduler_kwargs:
+      milestones: [900, 950]
+      gamma: 0.1
+  batch_size: 256
+  val_batch_size: 32
+  train_data_size: 128_000
+  val_data_size: 256
+  test_data_size: 1_000
+
+trainer:
+  max_epochs: 1000
+  check_val_every_n_epoch: 5
+
+callbacks:
+  model_checkpoint:
+    save_top_k: -1
+    save_last: True
+    every_n_epochs: 5
+    dirpath:  ${paths.output_dir}/checkpoints
+    filename: "{epoch:03d}-max_aug_reward{val/max_aug_reward:.2f}"
+    monitor: "val/max_aug_reward"

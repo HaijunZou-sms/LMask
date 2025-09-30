@@ -1,0 +1,19 @@
+# Customized for RL4CO
+_target_: rl4co.utils.trainer.RL4COTrainer
+
+default_root_dir: ${paths.output_dir}
+
+gradient_clip_val: 1.0
+accelerator: "auto"
+precision: "16-mixed"
+
+# perform a validation loop every N training epochs
+max_epochs: 10_000
+check_val_every_n_epoch: 50
+
+# set True to to ensure deterministic results
+# makes training slower but gives more reproducibility than just setting seeds
+deterministic: False
+
+devices: -1
+strategy: ddp_find_unused_parameters_true

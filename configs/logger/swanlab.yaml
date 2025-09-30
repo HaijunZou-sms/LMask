@@ -1,0 +1,23 @@
+# @package _global_
+logger:
+    swanlab:
+        _target_: swanlab.integration.pytorch_lightning.SwanLabLogger
+        project: "LMask"
+        experiment_name: null # will be set from command line
+        mode: null
+        tags: []
+        save_dir: "${paths.log_dir}"
+        logdir: "${paths.output_dir}/swanlog"
+
+hydra:
+  run:
+    dir: ${paths.log_dir}/runs/${logger.swanlab.experiment_name}/${now:%Y-%m-%d}_${now:%H}
+  sweep:
+    dir: ${paths.log_dir}/multiruns/${logger.swanlab.experiment_name}/${now:%Y-%m-%d}_${now:%H}
+    subdir: ${hydra.job.num}
+  job_logging:
+    handlers:
+      file:
+        class: logging.FileHandler
+        filename: ${paths.log_dir}/runs/${logger.swanlab.experiment_name}/${now:%Y-%m-%d}_${now:%H}/run.log
+        formatter: simple   

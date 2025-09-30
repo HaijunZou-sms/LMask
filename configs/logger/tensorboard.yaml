@@ -1,0 +1,25 @@
+# @package _global_
+
+# https://www.tensorflow.org/tensorboard/
+logger:
+  tensorboard:
+    _target_: lightning.pytorch.loggers.tensorboard.TensorBoardLogger
+    save_dir: "${paths.log_dir}/tensorboard/"
+    name: null
+    log_graph: False
+    default_hp_metric: True
+    prefix: ""
+    # version: ""
+
+hydra:
+  run:
+    dir: ${paths.log_dir}/runs/${logger.tensorboard.name}/${now:%Y-%m-%d}_${now:%H}
+  sweep:
+    dir: ${paths.log_dir}/multiruns/${logger.tensorboard.name}/${now:%Y-%m-%d}_${now:%H}
+    subdir: ${hydra.job.num}
+  job_logging:
+    handlers:
+      file:
+        class: logging.FileHandler
+        filename: ${paths.log_dir}/runs/${logger.tensorboard.name}/${now:%Y-%m-%d}_${now:%H}/run.log
+        formatter: simple   
