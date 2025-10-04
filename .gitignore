@@ -171,3 +171,9 @@ cython_debug/
 
 # Project specific
 sandbox/
+results/
+scripts/convert_npz_to_pkl.py
+scripts/transform_checkpoints.py
+play.ipynb
+.gitignore
+

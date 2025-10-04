@@ -23,7 +23,7 @@ import numpy as np
 from tensordict.tensordict import TensorDict
 from torch import Tensor
 
-PYVRP_SCALING_FACTOR = 1_000
+PYVRP_SCALING_FACTOR = 100_000
 MAX_VALUE = 1 << 42
 
 
@@ -88,7 +88,7 @@ def local_search_per_instance(instance, instance_solutions, max_trials, tw_penal
     for path_solution in instance_solutions:
         solution = Solution(problem_data, [path_solution])
         
-        improved_solution = perform_local_search(ls, solution, max_trials=max_trials, tw_penalty=tw_penalty)
+        improved_solution = perform_local_search(ls, solution, max_trials=max_trials, tw_penalty=tw_penalty*PYVRP_SCALING_FACTOR)
 
         instance_improved_solutions.append(solution2action(improved_solution))
         instance_costs.append(improved_solution.distance() / PYVRP_SCALING_FACTOR)
@@ -118,8 +118,8 @@ def perform_local_search(
             current_solution = improved_solution
             current_cost = current_solution.distance()
             if current_cost <=  best_cost or not best_solution.is_feasible():
-                print(f"best cost: { best_cost / PYVRP_SCALING_FACTOR}")
-                print(f"Improved solution found with cost: {current_solution.distance() / PYVRP_SCALING_FACTOR}")
+                # print(f"best cost: { best_cost / PYVRP_SCALING_FACTOR}")
+                # print(f"Improved solution found with cost: {current_solution.distance() / PYVRP_SCALING_FACTOR}")
                 best_solution = current_solution
                 best_cost = current_cost
         else:
@@ -158,7 +158,7 @@ def make_search_operator(data: ProblemData, seed=0, neighbourhood_params: Union[
     rng = RandomNumberGenerator(seed)
     neighbours = compute_neighbours(data, NeighbourhoodParams(**(neighbourhood_params or {})))
     ls = LocalSearch(data, rng, neighbours)
-    #ls.add_node_operator(Exchange10(data))
+    # ls.add_node_operator(Exchange10(data))
     for node_operator in NODE_OPERATORS:
         ls.add_node_operator(node_operator(data))
     for route_operator in ROUTE_OPERATORS:

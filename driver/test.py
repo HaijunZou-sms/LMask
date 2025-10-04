@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
     # Algorithm parameters
     parser.add_argument("--lookahead_step", type=int, choices=[1, 2, 3], default=2, help="Number of lookahead steps when getting inital masks")
-    parser.add_argument("--max_backtrack_steps", type=int, default=200)
+    parser.add_argument("--max_backtrack_steps", type=int, default=100)
     parser.add_argument("--decode_type", type=str, default="greedy")
     parser.add_argument("--num_samples", type=int, default=1)
 

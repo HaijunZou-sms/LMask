@@ -24,9 +24,9 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
         succ_feasible = load_succ <= (td["draft_limit"] + round_error_epsilon)  # [B, n+1]
         grandsucc_feasible = load_grandsucc <= (td["draft_limit"].unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
 
-        eye = torch.eye(td["locs"].size(1), dtype=torch.bool, device=td.device).unsqueeze(0)
-        skip_mask = td["visited"].unsqueeze(1) | eye  # [B, n+1, n+1]
-        grandsucc_check = (grandsucc_feasible | skip_mask).all(dim=-1)
+        eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device).unsqueeze(0)
+        visited_step1_per_choice = td["visited"].unsqueeze(1) | eye  # [B, n+1, n+1]
+        grandsucc_check = (grandsucc_feasible | visited_step1_per_choice).all(dim=-1)  # [B, n+1]
 
         unvisited = ~td["visited"]
         can_visit = unvisited & succ_feasible & grandsucc_check  # [B, n+1]
@@ -34,38 +34,31 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
     elif lookahead_step == 3:
         load_succ = td["current_load"].unsqueeze(-1) + td["demand"]  # [B, n+1]
         load_grandsucc = load_succ.unsqueeze(-1) + td["demand"].unsqueeze(1)  # [B, n+1, n+1]
-        load_greatgrandsucc = load_grandsucc.unsqueeze(-1) + td["demand"].unsqueeze(1).unsqueeze(
-            1
-        )  # [B, n+1, n+1, n+1]
+        load_greatgrandsucc = load_grandsucc.unsqueeze(-1) + td["demand"].unsqueeze(1).unsqueeze(1)  # [B, n+1, n+1, n+1]
 
         succ_feasible = load_succ <= (td["draft_limit"] + round_error_epsilon)  # [B, n+1]
         grandsucc_feasible = load_grandsucc <= (td["draft_limit"].unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
-        greatgrandsucc_feasible = load_greatgrandsucc <= (
-            td["draft_limit"].unsqueeze(1).unsqueeze(1) + round_error_epsilon
-        )  # [B, n+1, n+1, n+1]
+        greatgrandsucc_feasible = load_greatgrandsucc <= (td["draft_limit"].unsqueeze(1).unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1, n+1]
 
-        # Create skip mask
-        # - grand_skip_mask: [B, n+1, n+1] such that grand_skip_mask[b, i, j] = True if node j is visited in batch b or j = i
-        # - grandsucc_skip_mask: [B, n+1, n+1, n+1] such that grandsucc_skip_mask[b, i, j, k] = True if node k is visited in batch b or k=i or k = j
+
         num_nodes = td["locs"].size(1)
         eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device)
         eye_ij = eye.unsqueeze(0)  # [1, n+1, n+1]
         eye_jk = eye.unsqueeze(0).unsqueeze(0)  # [1, 1, n+1, n+1]
         eye_ik = eye.unsqueeze(0).unsqueeze(2)  # [1, n+1, 1, n+1]
 
-        assert eye_ij.shape == (1, num_nodes, num_nodes)
-        assert eye_jk.shape == (1, 1, num_nodes, num_nodes)
-        assert eye_ik.shape == (1, num_nodes, 1, num_nodes)
+        visited_step1_per_choice = td["visited"].unsqueeze(1) | eye_ij  # [B, n+1, n+1]
+        visited_step2_per_choice_pair = td["visited"].unsqueeze(1).unsqueeze(1) | eye_jk | eye_ik  # [B, n+1, n+1, n+1]
 
-        grand_skip_mask = td["visited"].unsqueeze(1) | eye_ij  # [B, n+1, n+1]
-        greatgrand_skip_mask = td["visited"].unsqueeze(1).unsqueeze(1) | eye_jk | eye_ik  # [B, n+1, n+1, n+1]
+        grandsucc_check = (grandsucc_feasible | visited_step1_per_choice).all(dim=-1)  # [B, n+1]
 
-        # check for great grand successors and grand successors
-        greatgrandsucc_check = (greatgrandsucc_feasible | greatgrand_skip_mask).all(dim=-1)  # [B, n+1, n+1]
-        grandsucc_check = (grandsucc_feasible & greatgrandsucc_check & ~grand_skip_mask).any(dim=-1)  # [B, n+1]
+        all_greatgrand_feasible = (greatgrandsucc_feasible | visited_step2_per_choice_pair).all(dim=-1)  # [B, n+1, n+1]
+        greatgrand_check = (all_greatgrand_feasible & ~visited_step1_per_choice).any(dim=-1)  # [B, n+1]
+        has_no_unvisited_grandchild = visited_step1_per_choice.all(dim=-1)
+        greatgrand_check = greatgrand_check | has_no_unvisited_grandchild
 
         unvisited = ~td["visited"]
-        can_visit = unvisited & succ_feasible & grandsucc_check  # [B, n+1]
+        can_visit = unvisited & succ_feasible & grandsucc_check & greatgrand_check  # [B, n+1]
 
     return can_visit
 
@@ -100,9 +93,7 @@ class TSPDLEnv(RL4COEnvBase):
 
     def get_action_mask(self, td):
         unvisited = ~td["visited"]
-        can_visit = get_action_mask(
-            td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon
-        )  # [B, n+1]
+        can_visit = get_action_mask(td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon)  # [B, n+1]
         action_mask = torch.where(can_visit.any(-1, keepdim=True), can_visit, unvisited)
         return action_mask
 

@@ -5,10 +5,9 @@ import torch
 from tensordict.tensordict import TensorDict
 from rl4co.envs.common.base import RL4COEnvBase
 from rl4co.utils.decoding import get_log_likelihood
-from rl4co.utils.ops import batchify, unbatchify, gather_by_index, calculate_entropy
+from rl4co.utils.ops import batchify, unbatchify, calculate_entropy
 from rl4co.data.transforms import StateAugmentation
 from ..utils.ops import get_action_from_logits_and_mask, slice_cache
-from .tsptw.local_search import local_search_from_data
 
 
 class LazyMaskEnvBase(RL4COEnvBase):
@@ -21,6 +20,7 @@ class LazyMaskEnvBase(RL4COEnvBase):
     """
 
     def __init__(self, **kwargs):
+        self.get_reward_by_distance = kwargs.pop("get_reward_by_distance", False)
         self.disable_backtracking = kwargs.pop("disable_backtracking", False)
         self.phase = kwargs.pop("phase", "test")
         self.max_backtrack_steps = kwargs.pop("max_backtrack_steps", 300)
@@ -89,8 +89,8 @@ class LazyMaskEnvBase(RL4COEnvBase):
             active = ~td["done"]
             has_feas = td["action_mask"].any(dim=-1)
             at_depot = td["step_idx"] == 0
-            
-            print(f"current partial solution: {td['node_stack'][0, :td['step_idx'][0]+1]}")
+            # print(f"current partial solution: {td['node_stack'][0, :td['step_idx'][0]+1]}")
+
             step_foward_mask = active & has_feas
             backtrack_mask = active & (~has_feas) & (~at_depot)
             invalid_mask = active & (~has_feas) & (at_depot)
@@ -160,14 +160,15 @@ class LazyMaskEnvBase(RL4COEnvBase):
         else:
             with torch.inference_mode():
                 with torch.amp.autocast("cuda") if "cuda" in str(device) else torch.inference_mode():
-                    return self._rollout_core(td, policy, num_samples, num_augment, decode_type, device, return_td, **kwargs)
+                    return self._rollout_core(
+                        td, policy, num_samples, num_augment, decode_type, device, return_td, **kwargs
+                    )
 
     def _rollout_core(
         self, td, policy, num_samples=1, num_augment=8, decode_type="greedy", device="cuda", return_td=False, **kwargs
     ):
         td = td.to(device)
         td = self.reset(td)
-        td_ori = td.clone()
 
         if self.phase == "train":
             num_augment = 0
@@ -187,27 +188,6 @@ class LazyMaskEnvBase(RL4COEnvBase):
             td = batchify(td, num_samples)
             td, logprobs_stack = self.decode_multi(td, hidden, policy, num_samples, decode_type)
 
-        if kwargs.get("local_search", False) and decode_type == "greedy" and not td["invalid"].any():
-            print("Performing local search...")
-            batch_size = td_ori["locs"].size(0)
-            actions = td["node_stack"][:, 1:]  # [B*A, ]
-            actions = unbatchify(actions, (num_augment))
-            actions = actions.reshape(batch_size, num_augment, -1)
-            actions, cost, sol_feas = local_search_from_data(
-                td_ori.cpu(),
-                actions.cpu().numpy(),
-                num_workers=kwargs.get("num_workers", 6),
-                max_trials=kwargs.get("max_trials", 3),
-                return_only_solutions=False,
-            )
-            actions = actions.reshape(batch_size, 8, -1)
-            sol_feas = sol_feas.reshape(batch_size, 8)
-            reward = -cost.reshape(batch_size, 8)
-            return TensorDict(
-                {"actions": actions, "reward": reward, "sol_feas": sol_feas},
-                batch_size=td_ori.batch_size,
-            )
-            
         out = self.get_rollout_result(td)
         if self.phase == "train":
             out["log_likelihood"] = get_log_likelihood(logprobs_stack, td["node_stack"])

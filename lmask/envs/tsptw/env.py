@@ -43,15 +43,14 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
         dur_cur_succ = td["duration_matrix"][batch_idx, td["current_node"], :]
 
         service_start_time_succ = torch.max(td["current_time"].unsqueeze(1) + dur_cur_succ, tw_early)
-        # Here dur_succ_grandsucc = distance_matrix
         service_start_time_grandsucc = torch.max(service_start_time_succ.unsqueeze(-1) + td["duration_matrix"], tw_early.unsqueeze(1))
 
         succ_feasible = service_start_time_succ <= (tw_late + round_error_epsilon)  # [B, n+1]
-        grandsucc_feasible = service_start_time_grandsucc <= (tw_late.unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
+        grandsucc_feasible = service_start_time_grandsucc <= ( tw_late.unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
 
         eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device).unsqueeze(0)
-        skip_mask = td["visited"].unsqueeze(1) | eye  # [B, n+1, n+1]
-        grandsucc_check = (grandsucc_feasible | skip_mask).all(dim=-1)  # [B, n+1]
+        visited_step1_per_choice = td["visited"].unsqueeze(1) | eye  # [B, n+1, n+1]
+        grandsucc_check = (grandsucc_feasible | visited_step1_per_choice).all(dim=-1)  # [B, n+1]
 
         unvisited = ~td["visited"]
         can_visit = unvisited & succ_feasible & grandsucc_check  # [B, n+1]
@@ -65,50 +64,34 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
         dur_cur_succ = td["duration_matrix"][batch_idx, td["current_node"], :]
         service_start_time_succ = torch.max(td["current_time"].unsqueeze(1) + dur_cur_succ, tw_early)
 
-        # Here dur_succ_grandsucc = distance_matrix
-        service_start_time_grandsucc = torch.max(
-            service_start_time_succ.unsqueeze(-1) + td["duration_matrix"], tw_early.unsqueeze(1)
-        )  # [B, n+1, n+1]
-        service_start_time_greatgrandsucc = torch.max(
-            service_start_time_grandsucc.unsqueeze(-1) + td["duration_matrix"].unsqueeze(1),
-            tw_early.unsqueeze(1).unsqueeze(1),
-        )  # [B, n+1, n+1, n+1]
+        service_start_time_grandsucc = torch.max(service_start_time_succ.unsqueeze(-1) + td["duration_matrix"], tw_early.unsqueeze(1))  # [B, n+1, n+1]
+        service_start_time_greatgrandsucc = torch.max(service_start_time_grandsucc.unsqueeze(-1) + td["duration_matrix"].unsqueeze(1), tw_early.unsqueeze(1).unsqueeze(1))  # [B, n+1, n+1, n+1]
 
         succ_feasible = service_start_time_succ <= (tw_late + round_error_epsilon)  # [B, n+1]
-        grandsucc_feasible = service_start_time_grandsucc <= (
-            tw_late.unsqueeze(1) + round_error_epsilon
-        )  # [B, n+1, n+1]
-        greatgrandsucc_feasible = service_start_time_greatgrandsucc <= (
-            tw_late.unsqueeze(1).unsqueeze(1) + round_error_epsilon
-        )  # [B, n+1, n+1, n+1]
+        grandsucc_feasible = service_start_time_grandsucc <= (tw_late.unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
+        greatgrandsucc_feasible = service_start_time_greatgrandsucc <= (tw_late.unsqueeze(1).unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1, n+1]
 
-        # Create skip mask
-        # - grand_skip_mask: [B, n+1, n+1] such that grand_skip_mask[b, i, j] = True if node j is visited in batch b or j = i
-        # - greatgrand_skip_mask: [B, n+1, n+1, n+1] such that greatgrand_skip_mask[b, i, j, k] = True if node k is visited in batch b or k=i or k = j
+
+        # visited_step1_per_choice [B, n+1, n+1]: for each step-1 candidate, the visited set after taking that single step.
+        # visited_step2_per_choice_pair [B, n+1, n+1, n+1]: for each (step-1, step-2) candidate pair, the visited set after taking two steps in sequence.
         eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device)
         eye_ij = eye.unsqueeze(0)  # [1, n+1, n+1]
         eye_jk = eye.unsqueeze(0).unsqueeze(0)  # [1, 1, n+1, n+1]
         eye_ik = eye.unsqueeze(0).unsqueeze(2)  # [1, n+1, 1, n+1]
 
-        assert eye_ij.shape == (1, num_nodes, num_nodes)
-        assert eye_jk.shape == (1, 1, num_nodes, num_nodes)
-        assert eye_ik.shape == (1, num_nodes, 1, num_nodes)
+        visited_step1_per_choice = td["visited"].unsqueeze(1) | eye_ij  # [B, n+1, n+1]
+        visited_step2_per_choice_pair = td["visited"].unsqueeze(1).unsqueeze(1) | eye_jk | eye_ik  # [B, n+1, n+1, n+1]
 
-        grand_skip_mask = td["visited"].unsqueeze(1) | eye_ij  # [B, n+1, n+1]
-        greatgrand_skip_mask = (
-            td["visited"].unsqueeze(1).unsqueeze(1) | eye_jk | eye_ik | eye_ij.unsqueeze(-1)
-        )  # [B, n+1, n+1, n+1]
+        grandsucc_check = (grandsucc_feasible | visited_step1_per_choice).all(dim=-1)  # [B, n+1]
 
-        # Suppose the current partial route is $\pi_{1:t}$. If $\pi_{t+1}$ is selectable, then
-        # - $\pi_{t+1}$ satisfies the time window constraints
-        # - there exists a grandchild node $\pi_{t+2}\in\{0,1\dots,n}\setminus \{\pi_1,\dots,\pi_{t+1}\}$ such that
-        #         - $\pi_{t+2}$ satisfies the time window constraints
-        #         - all the greatgrandchild nodes satisfy the time window constraints
-        all_greatgrandsucc_feasible = (greatgrandsucc_feasible | greatgrand_skip_mask).all(dim=-1)  # [B, n+1, n+1]
-        grandsucc_check = grandsucc_feasible & all_greatgrandsucc_feasible
+        all_greatgrand_feasible = (greatgrandsucc_feasible | visited_step2_per_choice_pair).all(dim=-1)  # [B, n+1, n+1]
+        greatgrand_check = (all_greatgrand_feasible & ~visited_step1_per_choice).any(dim=-1)  # [B, n+1]
+        has_no_unvisited_grandchild = visited_step1_per_choice.all(dim=-1)
+        greatgrand_check = greatgrand_check | has_no_unvisited_grandchild
 
         unvisited = ~td["visited"]
-        can_visit = unvisited & succ_feasible & (grandsucc_check & ~grand_skip_mask).any(dim=-1)  # [B, n+1]
+        can_visit = unvisited & succ_feasible & grandsucc_check & greatgrand_check  # [B, n+1]
+
     return can_visit
 
 
@@ -142,7 +125,7 @@ class TSPTWEnv(RL4COEnvBase):
             batch_size=batch_size,
             device=device,
         )
-        if self.lookahead_step == 2:
+        if self.lookahead_step >= 2:
             td_reset["distance_matrix"] = torch.cdist(td["locs"], td["locs"], p=2, compute_mode="donot_use_mm_for_euclid_dist")
             td_reset["duration_matrix"] = td_reset["distance_matrix"] + td["service_time"][:, :, None]
         td_reset.set("action_mask", self.get_action_mask(td_reset))
@@ -151,9 +134,11 @@ class TSPTWEnv(RL4COEnvBase):
     def get_action_mask(self, td):
         if self.lookahead_step == 1:
             return ~td["visited"]
-        elif self.lookahead_step == 2:
+        elif self.lookahead_step >= 2:
             unvisited = ~td["visited"]
-            can_visit = get_action_mask(td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon)
+            can_visit = get_action_mask(
+                td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon
+            )
             action_mask = torch.where(can_visit.any(-1, keepdim=True), can_visit, unvisited)
         return action_mask
 
@@ -295,16 +280,18 @@ class TSPTWLazyMaskEnv(LazyMaskEnvBase):
             batch_size=batch_size,
             device=device,
         )
-        
+
         if self.lookahead_step >= 2:
-            td_reset["distance_matrix"] = torch.cdist(
-                td["locs"], td["locs"], p=2, compute_mode="donot_use_mm_for_euclid_dist"
-            )
-            td_reset["duration_matrix"] = td_reset["distance_matrix"]
-            
+            if "duration_matrix" in td.keys():
+                td_reset["duration_matrix"] = td["duration_matrix"]
+                td_reset["distance_matrix"] = td["distance_matrix"]
+            else:
+                td_reset["distance_matrix"] = torch.cdist(td["locs"], td["locs"], p=2, compute_mode="donot_use_mm_for_euclid_dist")
+                td_reset["duration_matrix"] = td_reset["distance_matrix"]
+
         if self.disable_backtracking:
             td_reset["backtrack_budget_reached"] = torch.ones_like(td_reset["backtrack_budget_reached"])
-            
+
         action_mask = self.get_action_mask(td_reset)
         mask_stack = torch.zeros((*batch_size, num_nodes, num_nodes), dtype=torch.bool, device=device)
         mask_stack[:, 0] = action_mask
@@ -312,7 +299,9 @@ class TSPTWLazyMaskEnv(LazyMaskEnvBase):
         return td_reset
 
     def get_action_mask(self, td):
-        can_visit = get_action_mask(td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon)
+        can_visit = get_action_mask(
+            td, lookahead_step=self.lookahead_step, round_error_epsilon=self.round_error_epsilon
+        )
 
         if self.phase == "test":
             action_mask = can_visit
@@ -324,9 +313,17 @@ class TSPTWLazyMaskEnv(LazyMaskEnvBase):
         return action_mask
 
     def _get_reward(self, td, actions):
-        ordered_locs = torch.cat([td["locs"][:, 0:1], gather_by_index(td["locs"], actions)], dim=1)
-        diff = ordered_locs - ordered_locs.roll(-1, dims=-2)
-        tour_length = diff.norm(dim=-1).sum(-1)
+        if self.get_reward_by_distance:
+            batch_size = actions.shape[0]
+            batch_idx = torch.arange(batch_size, device=actions.device).unsqueeze(-1)
+            tours = torch.cat([torch.zeros(batch_size, 1, dtype=torch.long, device=actions.device), actions], dim=-1)
+            shifted_tours = torch.roll(tours, -1)
+            arc_lengths = td["distance_matrix"][batch_idx, tours, shifted_tours]
+            tour_length = arc_lengths.sum(dim=-1)
+        else:
+            ordered_locs = torch.cat([td["locs"][:, 0:1], gather_by_index(td["locs"], actions)], dim=1)
+            diff = ordered_locs - ordered_locs.roll(-1, dims=-2)
+            tour_length = diff.norm(dim=-1).sum(-1)
         return -tour_length
 
     def _get_violations(self, td, actions):
@@ -339,9 +336,12 @@ class TSPTWLazyMaskEnv(LazyMaskEnvBase):
 
         batch_idx = torch.arange(td["locs"].size(0), device=td.device)
         curr_node, new_node = td["current_node"], td["action"]
-        curr_loc, new_loc = gather_by_index(td["locs"], curr_node), gather_by_index(td["locs"], new_node)
+        if self.get_reward_by_distance:
+            travel_time = td["distance_matrix"][batch_idx, curr_node, new_node]
+        else:
+            curr_loc, new_loc = gather_by_index(td["locs"], curr_node), gather_by_index(td["locs"], new_node)
+            travel_time = get_distance(curr_loc, new_loc)
 
-        travel_time = get_distance(curr_loc, new_loc)
         arrival_time = td["current_time"] + travel_time
         tw_early_new = gather_by_index(td["time_windows"][..., 0], new_node)
         service_time = gather_by_index(td["service_time"], new_node)
@@ -382,7 +382,9 @@ class TSPTWLazyMaskEnv(LazyMaskEnvBase):
         td["backtrack_budget_reached"] = td["backtrack_steps"] >= self.max_backtrack_steps
 
         td["mask_stack"][batch_idx, new_step_idx, deleted_node] = False
-        td["refine_intensity_stack"][batch_idx, new_step_idx] = td["refine_intensity_stack"][batch_idx, new_step_idx] + 1
+        td["refine_intensity_stack"][batch_idx, new_step_idx] = (
+            td["refine_intensity_stack"][batch_idx, new_step_idx] + 1
+        )
 
         if self.phase == "test":
             td["done"] = td["backtrack_budget_reached"]

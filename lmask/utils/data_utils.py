@@ -55,9 +55,9 @@ def read_tsptw_instance(file_path: str) -> dict:
 
     with open(file_path, "r") as file:
         lines = file.readlines()
-        for line in lines[6:-1]:
-            parts = line.split()
-            if len(parts) == 7:
+        for line in lines[6:]:
+            parts = line.strip().split()
+            if len(parts) == 7 and parts[0] != "999":
                 x_coord = float(parts[1])
                 y_coord = float(parts[2])
                 locs.append([x_coord, y_coord])
@@ -72,3 +72,29 @@ def read_tsptw_instance(file_path: str) -> dict:
         batch_size=[1],
     )
     return td
+
+
+def read_dumas_distance_matrix(file_path):
+    """
+    Read the distance matrix from a Dumas format file.
+
+    Args:
+        file_path (str): Path to the file.
+
+    Returns:
+        torch.Tensor: Distance matrix with shape (n_nodes, n_nodes) and data type float.
+    """
+    import torch
+
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+
+    n_nodes = int(lines[0].strip())
+    distance_matrix = []
+    for i in range(1, n_nodes + 1):
+        row = list(map(float, lines[i].strip().split()))
+        distance_matrix.append(row)
+
+    distance_matrix = torch.tensor(distance_matrix, dtype=torch.float32)
+
+    return distance_matrix.unsqueeze(0)
