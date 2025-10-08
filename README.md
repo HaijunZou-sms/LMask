@@ -54,21 +54,16 @@ You may change the experiment `experiment=main/tsptw/tsptw50-medium` by using th
 
 ## Results
 ### Backtracking vs. Lookahead
+The following figure shows results across different lookahead steps. With two-step lookahead (TSL), LMask attains a zero solution infeasibility rate within 20s. Even with the less accurate single-step lookahead (SSL), LMask drives the infeasibility rate down to the second lowest level by allocating a larger backtracking budget. However, PIP and PIP-D exhibit unacceptably high infeasibility rates under SSL. Increasing the lookahead step from 2 to 3 induces an order of magnitude rise in inference time while yielding only marginal gains and the outcomes remain inferior to LMask under SSL with $R=700$. These results demonstrate that backtracking combined with a lightweight lookahead initialization is more efficient than methods that rely exclusively on deeper lookaheads. 
 <p align="center">
   <img src="./assets/backtrack_lookahead.png">
 </p>
 
 ### Effect of Backtracking Budget
-<div style="text-align:center">
-  <figure style="display:inline-block; width:100%; margin:0 1%; text-align:center;">
-    <img src="./assets/backtracking_budget_SSL.png" style="max-width:100%;" alt="SSL">
-    <figcaption>SSL</figcaption>
-  </figure>
-  <figure style="display:inline-block; width:100%; margin:0 1%; text-align:center;">
-    <img src="./assets/backtracking_budget_TSL.png" style="max-width:100%;" alt="TSL">
-    <figcaption>TSL</figcaption>
-  </figure>
-</div>
+The following figure demonstrates how the backtracking budget $R$ influences the performance of LMask under TSL. The results show that inference time exhibits a nearly linear growth with respect to $R$, with an increase of approximately 2 seconds per 100 additional backtracking budget, demonstrating manageable computational overhead. In contrast, infeasibility rates decrease sharply at small values of $R$, indicating substantial early-stage gains in feasibility. Notably, instance infeasibility effectively vanishes at $R=100$, requiring only 17 seconds of inference time. These results highlight that larger backtracking budgets substantially improve solution feasibility with modest increases in runtime.
+<p align="center">
+  <img src="./assets/backtracking_budget_TSL.png">
+</p>
 
 ### Ablation Study on Refinement Intensity Embedding
 <p align="center">
@@ -76,6 +71,8 @@ You may change the experiment `experiment=main/tsptw/tsptw50-medium` by using th
 </p>
 
 ### Effect of the Entropy Term
+In the following figure, we report the results on easy TSPTW-100  for models trained with different entropy coefficients $\lambda$. The optimality gap exhibits a non-monotonic pattern. It decreases as $\lambda$ increases from 0 to 0.01, achieving the best performance at $\lambda=0.01$, but then rises significantly at $\lambda=0.05$. 
+This reflects the intrinsic trade-off between exploration and concentration in the probabilistic model, and suggests that choosing an appropriate entropy coefficient can improve solution optimality. This observation also aligns with our theoretical analysis in our paper.
 <p align="center">
   <img src="./assets/entropy.png">
 </p>
