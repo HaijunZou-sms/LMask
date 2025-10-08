@@ -11,7 +11,7 @@ from driver.test import test_model_on_random_dataset
 from lmask.utils.utils import infer_default_cofigs
 
 
-def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained"):
+def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained", save_file = "main_results.csv", decode_type="greedy", num_samples = 1, use_reld=False):
     # Create a structure to define all test configurations
     test_configs = [
         # TSPTW size 50
@@ -81,19 +81,19 @@ def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained"):
         },
     ]
 
-    # Create CSV file to store results
+    # Create directories to store results
     os.makedirs("./results", exist_ok=True)
-    csv_path = f"./results/main_results.csv"
+    save_path = os.path.join("./results", save_file)
+    checkpoint_dir = f"{checkpoint_dir}/reld" if use_reld else checkpoint_dir
 
     print(f"Running tests for {len(test_configs)} configurations...")
-    print(f"Results will be saved to {csv_path}")
+    print(f"Results will be saved to {save_path}")
 
     results = []
 
     for i, config in enumerate(test_configs):
         print(f"\n[{i+1}/{len(test_configs)}] Testing {config['problem_type']}{config['problem_size']} {config['hardness']}...")
 
-        # Get paths and settings using utility function
         inferred_configs = infer_default_cofigs(
             problem=config["problem_type"],
             problem_size=config["problem_size"],
@@ -105,9 +105,14 @@ def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained"):
 
         # If any of the parameters are not provided in the config, use the inferred values
         env_name = config.get("env_name", inferred_configs["env_name"])
-        policy_name = config.get("policy_name", inferred_configs["policy_name"])
+        policy_name = inferred_configs["policy_name"] if use_reld else config.get("policy_name", inferred_configs["policy_name"])
         checkpoint = config.get("checkpoint", inferred_configs["checkpoint"])
         test_path = config.get("test_path", inferred_configs["test_path"])
+        
+        if config["problem_size"] == 100 and num_samples >=30:
+                batch_size = 1000
+        else:
+                batch_size = 2500
 
         # Run test and collect metrics
         try:
@@ -119,14 +124,16 @@ def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained"):
                 max_backtrack_steps=config["max_backtrack_steps"],
                 lookahead_step=2,
                 verbose=True,
-                batch_size=2500,
+                batch_size=batch_size,
                 seed=2025,
+                use_reld=use_reld,
+                decode_type=decode_type,
+                num_samples=num_samples,
             )
 
-            # Add configuration details to metrics and convert to required format
             sol_infeas_rate = 1 - metrics["sol_feas_rate"]
             ins_infeas_rate = 1 - metrics["ins_feas_rate"]
-            obj_value = -metrics["avg_reward"]  # Negative of reward as requested
+            obj_value = -metrics["avg_reward"]  
             gap_percent = metrics["avg_gap"]
 
             result = {
@@ -149,27 +156,29 @@ def run_tests(data_dir="./data/random", checkpoint_dir="./pretrained"):
         # Make sure columns are in the specified order
         fieldnames = ["problem_type", "problem_size", "hardness", "sol_infeas_rate", "ins_infeas_rate", "Obj", "Gap", "Time"]
 
-        with open(csv_path, "w", newline="") as csvfile:
+        with open(save_path, "w", newline="") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(results)
 
-        print(f"\nAll tests completed. Results saved to {csv_path}")
+        print(f"\nAll tests completed. Results saved to {save_path}")
     else:
         print("No results were generated.")
 
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=FutureWarning)
-    warnings.filterwarnings(
-        "ignore",
-        category=DeprecationWarning,
-    )
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
     warnings.filterwarnings("ignore", message="Attribute.*is an instance of `nn.Module`")
     warnings.filterwarnings("ignore", message="Unused keyword arguments:.*")
     parser = argparse.ArgumentParser(description="Run tests on all datasets")
     parser.add_argument("--data_dir", type=str, default="./data/random", help="Directory containing the test data")
     parser.add_argument("--checkpoint_dir", type=str, default="./pretrained", help="Directory containing the pretrained models")
+    parser.add_argument("--save_file", type=str, default="main_results.csv", help="Path to save the results CSV")
+    parser.add_argument("--use_reld", action="store_true", help="Use RELD as decoder if set; otherwise, use standard decoder")
+    parser.add_argument("--decode_type", type=str, default="greedy", choices=["greedy", "sampling"], help="Decoding strategy to use")
+    parser.add_argument("--num_samples", "-S", type=int, default=1, help="Number of samples to draw if using sampling decode type")
+
     args = parser.parse_args()
 
-    run_tests(data_dir=args.data_dir, checkpoint_dir=args.checkpoint_dir)
+    run_tests(data_dir=args.data_dir, checkpoint_dir=args.checkpoint_dir, save_file=args.save_file, decode_type=args.decode_type, num_samples=args.num_samples, use_reld=args.use_reld)

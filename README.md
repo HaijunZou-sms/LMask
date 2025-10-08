@@ -1,4 +1,4 @@
-# LMask
+# LMask: Learn to Solve Constrained Routing Problems with Lazy Masking 
 <details>
     <summary><strong>Overview</strong></summary>
 <p align="center"><img src="./assets/LMask.png" width=95%></p>
@@ -11,7 +11,7 @@ conda create -n lmask python=3.10
 conda activate lmask
 pip install -r requirements.txt
 ```
-- Main Python packages:
+<!-- - Main Python packages:
   * PyTorch = 2.5.1
   * RL4CO = 0.5.2
   * TensorDict = 0.6.2
@@ -19,7 +19,7 @@ pip install -r requirements.txt
   * PyVRP = 0.11.0
   * Numpy = 2.2.6
   * Pandas
-  * tqdm
+  * tqdm -->
   
 
 ## Quickstart
@@ -33,42 +33,16 @@ python generate_datasets.py
 ```bash
 python driver/test.py --problem tsptw --problem_size 50 --hardness hard
 ```
-If not provided, `test_path`, `checkpoint` and `ref_sol_path` will be automatically inferred from `problem`, `problem_size` and `hardness`. 
-You can also provide additional parameters
-```bash
-usage: test.py [-h] [--seed SEED] [--batch_size BATCH_SIZE] [--problem {tspdl,tsptw}] [--problem_size {50,100}] [--hardness {easy,medium,hard}] 
-               [--env_name ENV_NAME] [--policy_name POLICY_NAME] [--checkpoint CHECKPOINT] [--test_path TEST_PATH] [--ref_sol_path REF_SOL_PATH]
-               [--lookahead_step {1,2}] [--max_backtrack_steps MAX_BACKTRACK_STEPS] 
-options:
-  -h, --help            show this help message and exit
-  --seed SEED
-  --batch_size BATCH_SIZE
-  --problem {tspdl,tsptw}
-                        Problem type
-  --problem_size {50,100}
-                        Problem size
-  --hardness {easy,medium,hard}
-                        Problem difficulty
-  --env_name ENV_NAME   Environment name
-  --policy_name POLICY_NAME
-                        Class name of the policy
-  --checkpoint CHECKPOINT
-                        Path to model checkpoint
-  --test_path TEST_PATH
-                        Path to test dataset
-  --ref_sol_path REF_SOL_PATH
-                        Path to reference solutions
-  --lookahead_step {1,2}
-                        Number of lookahead steps when initializing the overestimation sets
-  --max_backtrack_steps MAX_BACKTRACK_STEPS
-
-```
+You can also provide additional parameters like `max_backtrack_steps` and `lookahead_step` (see the script for more details).
 * Test all datasets
 ```bash
 python driver/test_all.py
 ```
-The results will be saved to `results/main_results.csv`.
 
+* Test Dumas benchmark instances for TSPTW
+```bash
+python driver/test_dumas.py
+```
 
 ### Training
 ```bash
@@ -78,3 +52,40 @@ You may change the experiment `experiment=main/tsptw/tsptw50-medium` by using th
 
 **Note**: After training, to use the checkpoints in test.py, you should first run the script `sripts/transform_checkpoints.py` to convert ckpt files to pth files.
 
+## Results
+### Backtracking vs. Lookahead
+<p align="center">
+  <img src="./assets/backtrack_lookahead.png">
+</p>
+
+### Effect of Backtracking Budget
+<div style="text-align:center">
+  <figure style="display:inline-block; width:100%; margin:0 1%; text-align:center;">
+    <img src="./assets/backtracking_budget_SSL.png" style="max-width:100%;" alt="SSL">
+    <figcaption>SSL</figcaption>
+  </figure>
+  <figure style="display:inline-block; width:100%; margin:0 1%; text-align:center;">
+    <img src="./assets/backtracking_budget_TSL.png" style="max-width:100%;" alt="TSL">
+    <figcaption>TSL</figcaption>
+  </figure>
+</div>
+
+### Ablation Study on Refinement Intensity Embedding
+<p align="center">
+  <img src="./assets/RIE_ablation.png">
+</p>
+
+### Effect of the Entropy Term
+<p align="center">
+  <img src="./assets/entropy.png">
+</p>
+
+## Citation
+```bash
+@article{li2025lmask,
+  title={LMask: Learn to Solve Constrained Routing Problems with Lazy Masking},
+  author={Li, Tianyou and Zou, Haijun and Wu, Jiayuan and Wen, Zaiwen},
+  journal={arXiv preprint arXiv:2505.17938},
+  year={2025}
+}
+```

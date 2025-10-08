@@ -24,7 +24,7 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
         succ_feasible = load_succ <= (td["draft_limit"] + round_error_epsilon)  # [B, n+1]
         grandsucc_feasible = load_grandsucc <= (td["draft_limit"].unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
 
-        eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device).unsqueeze(0)
+        eye = torch.eye(td["locs"].size(-2), dtype=torch.bool, device=td.device).unsqueeze(0)
         visited_step1_per_choice = td["visited"].unsqueeze(1) | eye  # [B, n+1, n+1]
         grandsucc_check = (grandsucc_feasible | visited_step1_per_choice).all(dim=-1)  # [B, n+1]
 
@@ -39,7 +39,6 @@ def get_action_mask(td, lookahead_step=2, round_error_epsilon=1e-5):
         succ_feasible = load_succ <= (td["draft_limit"] + round_error_epsilon)  # [B, n+1]
         grandsucc_feasible = load_grandsucc <= (td["draft_limit"].unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1]
         greatgrandsucc_feasible = load_greatgrandsucc <= (td["draft_limit"].unsqueeze(1).unsqueeze(1) + round_error_epsilon)  # [B, n+1, n+1, n+1]
-
 
         num_nodes = td["locs"].size(1)
         eye = torch.eye(num_nodes, dtype=torch.bool, device=td.device)

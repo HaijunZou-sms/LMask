@@ -40,6 +40,7 @@ def test_model_on_random_dataset(
     ref_sol_path=None,
     batch_size=2500,
     seed=2025,
+    use_reld = False,
     **kwargs,
 ):
     """
@@ -76,7 +77,8 @@ def test_model_on_random_dataset(
     env = get_env(env_name, **kwargs)
 
     # Load the policy
-    policy = getattr(lmask.models.policy, policy_name)()
+    policy_class = getattr(lmask.models.policy, policy_name)
+    policy = policy_class(decoder_class="reld") if use_reld else policy_class()
     policy.load_state_dict(torch.load(checkpoint))
     policy.to(device).eval()
 
@@ -125,10 +127,7 @@ def test_model_on_random_dataset(
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=FutureWarning)
-    warnings.filterwarnings(
-        "ignore",
-        category=DeprecationWarning,
-    )
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     warnings.filterwarnings("ignore", message="Attribute.*is an instance of `nn.Module`")
 
     parser = argparse.ArgumentParser()
@@ -148,10 +147,10 @@ if __name__ == "__main__":
     parser.add_argument("--ref_sol_path", type=str, help="Path to reference solutions")
 
     # Algorithm parameters
-    parser.add_argument("--lookahead_step", type=int, choices=[1, 2, 3], default=2, help="Number of lookahead steps when getting inital masks")
-    parser.add_argument("--max_backtrack_steps", type=int, default=100)
-    parser.add_argument("--decode_type", type=str, default="greedy")
-    parser.add_argument("--num_samples", type=int, default=1)
+    parser.add_argument("--lookahead_step", "-L", type=int, choices=[1, 2, 3], default=2, help="Number of lookahead steps when getting inital masks")
+    parser.add_argument("--max_backtrack_steps", "-R", type=int, default=100)
+    parser.add_argument("--decode_type", type=str, default="greedy", choices=["greedy", "sampling"], help="Decoding strategy")
+    parser.add_argument("--num_samples", "-N", type=int, default=1)
 
     args = parser.parse_args()
 

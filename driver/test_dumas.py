@@ -41,13 +41,15 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", type=str, default="./pretrained/tsptw/tsptw50-medium.pth")
     parser.add_argument("--test_dir", type=str, default="./data/dumas")
     parser.add_argument("--save_dir", type=str, default="./results")
+    parser.add_argument("--save_file", type=str, default="tsptw_dumas_results.csv")
+    
     parser.add_argument("--max_backtrack_steps", type=int, default=5000)
-    parser.add_argument("--local_search", action="store_true", help="whether to use local search")
+    parser.add_argument("--local_search", "-ls", action="store_true", help="whether to use local search")
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--max_trials", type=int, default=3)
     args = parser.parse_args()
 
-    csv_file = f"{args.save_dir}/tsptwlib-tsptw50.csv"
+    csv_file = f"{args.save_dir}/{args.save_file}"
     print(f"Test data from {args.test_dir}")
     print(f"Load model from {args.checkpoint}")
     print(f"Use environment {args.env_name}")
@@ -68,35 +70,49 @@ if __name__ == "__main__":
     distances_dir = os.path.join(test_dir, "distances")
     location_files = [f for f in natsorted(os.listdir(locations_dir)) if f.endswith(".txt")]
     instance_names = [os.path.splitext(f)[0] for f in location_files]
-    
+    instance_names.insert(0, instance_names[0]) # Add a warm-up instance to mitigate GPU initialization time
+    df_opt = pd.read_csv(os.path.join(test_dir, "Traveltime_Bounds.csv"))
+    df_opt.set_index('Instance Name', inplace=True)
+
     scaler = 50.0
     for instance_name in instance_names:
+        opt = df_opt.loc[instance_name, 'Best Known Solution']
         location_path = os.path.join(locations_dir, f"{instance_name}.txt")
         distance_path = os.path.join(distances_dir, f"{instance_name}.txt")
         td = read_tsptw_instance(location_path)
         td["distance_matrix"] = read_dumas_distance_matrix(distance_path)
         td["duration_matrix"] = td["distance_matrix"] + td["service_time"].unsqueeze(-1)
         td = td / scaler
-
+       
         start = time.time()
         out, td = env.rollout(td, policy, return_td = True)
+        
+        max_aug_reward = get_filtered_max(out["reward"], out["sol_feas"])
+        best_cost = convert_length(- max_aug_reward.item() * scaler)
+        gap = (best_cost - opt) / opt * 100
+        ins_feas = out["sol_feas"].any(dim=1).float().item()
+
         # local_search
-        if args.local_search:
-            actions = td["node_stack"][:, 1:] 
-            actions, cost, sol_feas = local_search_from_data(td.cpu(), actions.cpu().numpy(), num_workers = args.num_workers, max_trials = args.max_trials, return_only_solutions=False)
+        if args.local_search and gap > 0.0:
+            actions = td["node_stack"][:, 1:]
+            actions, cost, sol_feas = local_search_from_data(td.cpu(), actions.cpu().numpy(), num_workers=args.num_workers, max_trials=args.max_trials, return_only_solutions=False)
             reward, sol_feas = - cost.unsqueeze(0), sol_feas.unsqueeze(0)
 
-        else:
-            reward, sol_feas = out["reward"], out["sol_feas"]
+            max_aug_reward = get_filtered_max(reward, sol_feas)
+            best_cost = convert_length(- max_aug_reward.item() * scaler)
+            gap = (best_cost - opt) / opt * 100 
+            ins_feas = sol_feas.any(dim=1).float().item()
+
+
         inference_time = time.time() - start
-        max_aug_reward = get_filtered_max(reward, sol_feas)
-        ins_feas = sol_feas.any(dim=1).float().item()
-        
-        print(f"Instance {instance_name} finished, best cost: {- max_aug_reward.item()*scaler: .0f}")
+
+
+        print(f"Instance {instance_name} finished, best cost: {best_cost} | gap: {gap: .2f}%")
         df = pd.DataFrame(
             {
                 "Problem": [instance_name],
-                "Length": [convert_length(-max_aug_reward.item() * scaler)],
+                "Length": [best_cost],
+                "Gap": f"{gap:.2f}%",
                 "Ins_feas": [ins_feas],
                 "Sovling Time": [round(inference_time, 2)],
             }
