@@ -3,7 +3,7 @@ This is the implementation for the paper [LMask: Learn to Solve Constrained Rout
 ## Algorithm Framework
 LMask is a novel learning framework that utilizes dynamic masking to generate high-quality feasible solutions for constrained routing problems. A wide range of routing problems can be expressed using the following formulation:
 $$\min_{\pi\in \Pi} \quad f(\pi;\mathcal{P}),\quad
-        \mathrm{s.t.} \quad c(\pi;\mathcal{P})\leq 0,\,d(\pi;\mathcal{P}) = 0,$$
+        \mathrm{s.t.} \quad c(\pi;\mathcal{P})\leq 0,d(\pi;\mathcal{P}) = 0,$$
 
 where $\mathcal{P}$ represents the problem instance, $c(\pi;\mathcal{P})$ and $d(\pi;\mathcal{P})$ represent the hard constraints imposed on the route $\pi$. $d(\pi;\mathcal{P})=0$ can be the visit constraints that each node is exactly visited once. $c(\pi;\mathcal{P})\leq 0$ can represent time window constraints, draft limit constraints, etc.
 
