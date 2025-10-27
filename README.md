@@ -47,6 +47,9 @@ python run.py experiment=main/tsptw/tsptw50-medium
 You may change the experiment `experiment=main/tsptw/tsptw50-medium` by using the `experiment=YOUR_EXP`, with the path under [`configs/experiment`](configs/experiment) directory. **Note**: After training, to use the checkpoints in test.py, you should first run the script `scripts/transform_checkpoints.py` to convert ckpt files to pth files.
 
 ## Results
+### Results on TSPTW synthetic datasets
+
+
 ### Backtracking vs. Lookahead
 The following figure shows results across different lookahead steps. With two-step lookahead (TSL), LMask attains a zero solution infeasibility rate within 20s. Even with the less accurate single-step lookahead (SSL), LMask drives the infeasibility rate down to the second lowest level by allocating a larger backtracking budget. However, PIP and PIP-D exhibit unacceptably high infeasibility rates under SSL. Increasing the lookahead step from 2 to 3 induces an order of magnitude rise in inference time while yielding only marginal gains and the outcomes remain inferior to LMask under SSL with $R=700$. These results demonstrate that backtracking combined with a lightweight lookahead initialization is more efficient than methods that rely exclusively on deeper lookaheads. 
 <p align="center">
