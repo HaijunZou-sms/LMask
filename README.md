@@ -61,7 +61,7 @@ python run.py experiment=main/tsptw/tsptw50-medium
 You may change the experiment `experiment=main/tsptw/tsptw50-medium` by using the `experiment=YOUR_EXP`, with the path under [`configs/experiment`](configs/experiment) directory. **Note**: After training, to use the checkpoints in test.py, you should first run the script `scripts/transform_checkpoints.py` to convert ckpt files to pth files.
 
 ## Results
-### Results on TSPTW synthetic datasets
+### Results on TSPTW Synthetic Datasets
 Partial results on TSPTW synthetic datasets across different hardness levels are presented in the following two tables. Some conclusions can be drawn:
 - Compared with traditional solvers (PyVRP, LKH3 and OR-Tools), LMask has a clear advantage in algorithmic efficiency due to the inference capability of neural networks. While traditional heuristics operate on the magnitude of hours or even days—specifically, on the Hard ($n=100$) dataset, PyVRP requires $4.3\text{h}$ and LKH3 takes as long as $1\text{d}8\text{h}$—LMask accomplishes the same task with second-level latency, requiring only $18\text{s}$.
   
