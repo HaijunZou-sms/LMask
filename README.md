@@ -88,7 +88,7 @@ Partial results on TSPTW synthetic datasets across different hardness levels are
 | LMask | **0.00%** | **0.00%** | **51.38** | **0.21%** | 18s |
 
 ### Backtracking vs. Lookahead
-The following figure reports solution infeasibility against inference time. It compares four methods, LMask with SSL training, LMask with TSL training, PIP, and PIP-D. For LMask, longer inference time is obtained by increasing the backtracking budget $R$. For PIP and PIP-D, longer inference time is obtained by increasing the lookahead depth. The results show that 
+The following figure reports solution infeasibility against inference time. It compares four methods, LMask with SSL training, LMask with TSL training, PIP, and PIP-D. For LMask, longer inference time is obtained by increasing the backtracking budget. For PIP and PIP-D, longer inference time is obtained by increasing the lookahead depth. The results show that 
 - Relying solely on computationally expensive lookaheads creates a significant trade off between mask accuracy and efficiency. 
 - Backtracking offers a flexible and powerful way to handle complex constraints because it enables the use of a lightweight overestimation strategy.
 
@@ -103,11 +103,9 @@ The following figure demonstrates how the backtracking budget $R$ influences the
 </p>
 
 ### Visualization of the Decoding Process
-The next figure visualizes the LazyMask decoding process on a small TSPDL instance with $n=19$, using two trials with different backtracking budgets. The top row corresponds to $R=0$ and the bottom row corresponds to $R=100$. In the left column, the x axis is the decoding step $t$ and the y axis is the node index $i$. Colors indicate set membership relative to the true potential set $S(\pi_{1:t})$ and its overestimation $\hat S(\pi_{1:t})$. Dark blue denotes $i\notin \hat S(\pi_{1:t})$, teal denotes $i\in \hat S(\pi_{1:t})\setminus S(\pi_{1:t})$, and yellow denotes $i\in S(\pi_{1:t})$. The node selected by the policy at each step is marked by a red bounding box. For a failed trial, the visualization is truncated at the step where $S(\pi_{1:t})$ becomes empty after the backtracking budget is exhausted. The right column reports the corresponding decoding distribution $p_\theta(\cdot\mid \pi_{1:t})$ at each step.
+The next figure visualizes the LazyMask decoding process on a small TSPDL instance, using two trials with different backtracking budgets. The top row corresponds to $R=0$ and the bottom row corresponds to $R=100$. In the left column, the x axis is the decoding step $t$ and the y axis is the node index $i$. Colors indicate set membership relative to the true potential set $S(\pi_{1:t})$ and its overestimation $\hat S(\pi_{1:t})$. Dark blue denotes $i\notin \hat S(\pi_{1:t})$, teal denotes $i\in \hat S(\pi_{1:t})\setminus S(\pi_{1:t})$, and yellow denotes $i\in S(\pi_{1:t})$. The node selected by the policy at each step is marked by a red bounding box. For a failed trial, the visualization is truncated at the step where $S(\pi_{1:t})$ becomes empty after the backtracking budget is exhausted. The right column reports the corresponding decoding distribution $p_\theta(\cdot\mid \pi_{1:t})$ at each step.
 
 As demonstrated, the policy trained with $\ell_1$ penalty  has a support close to the feasible region, so early greedy choices fall in $S(\pi_{1:t})$ even when $\hat S(\pi_{1:t})$ is loose. Nevertheless, the policy makes a wrong selection at $t=14$, and the algorithm continues to extend until $t=17$ where no node remains selectable. Backtracking is then triggered and alternates with further extensions to eliminate the incorrect choice. A small budget such as $R=100$ is sufficient to recover and complete a feasible route, while $R=0$ fails.
-
-
 
 <p align="center">
   <img src="./assets/decoding_visualization.png" width=90%>
