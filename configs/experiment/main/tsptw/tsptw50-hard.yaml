@@ -43,5 +43,5 @@ callbacks:
     save_last: True
     every_n_epochs: 5
     dirpath:  ${paths.output_dir}/checkpoints
-    filename: "{epoch:03d}-max_aug_reward{val/ins_feas_rate:.2f}"
+    filename: "{epoch:03d}-ins_feas_rate{val/ins_feas_rate:.2f}"
     monitor: "val/ins_feas_rate"

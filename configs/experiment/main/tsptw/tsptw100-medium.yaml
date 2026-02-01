@@ -18,16 +18,16 @@ model:
   penalty_type: combined_penalty
   entropy_coef: 0.05
   optimizer_kwargs:
-    lr: 4e-4
+    lr: 1e-4
     weight_decay: 1e-6
   lr_scheduler:
     "MultiStepLR"
   lr_scheduler_kwargs:
       milestones: [900, 950]
       gamma: 0.1
-  batch_size: 256
+  batch_size: 64
   val_batch_size: 32
-  train_data_size: 128_000
+  train_data_size: 100_000
   val_data_size: 256
   test_data_size: 1_000
 
